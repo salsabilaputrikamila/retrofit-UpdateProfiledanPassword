@@ -2,20 +2,24 @@ package id.putraprima.retrofit.ui;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.android.material.snackbar.BaseTransientBottomBar;
 import com.google.android.material.snackbar.Snackbar;
+
+import java.util.List;
 
 import id.putraprima.retrofit.R;
 import id.putraprima.retrofit.api.helper.ServiceGenerator;
 import id.putraprima.retrofit.api.models.AppVersion;
-import id.putraprima.retrofit.api.models.Session;
 import id.putraprima.retrofit.api.services.ApiInterface;
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -23,23 +27,20 @@ import retrofit2.Response;
 
 public class SplashActivity extends AppCompatActivity {
     TextView lblAppName, lblAppTittle, lblAppVersion;
-    private Session session;
-    private View rView;
 
-    public Session getSession() {
-        return session;
-    }
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_splash);
-        rView = findViewById(android.R.id.content).getRootView();
-        session = new Session(this);
-        session = getSession();
         setupLayout();
-        if (checkInternetConnection()) {
+        if (checkInternetConnection()==true) {
             checkAppVersion();
+        }else{
+            //Toast.makeText(this, "No connection", Toast.LENGTH_SHORT).show();
+            View parentLayout = findViewById(android.R.id.content);
+            snackbar(parentLayout);
         }
         setAppInfo();
     }
@@ -55,31 +56,46 @@ public class SplashActivity extends AppCompatActivity {
 
     private boolean checkInternetConnection() {
         //TODO : 1. Implementasikan proses pengecekan koneksi internet, berikan informasi ke user jika tidak terdapat koneksi internet
-        ConnectivityManager connec =
-                (ConnectivityManager)getSystemService(getBaseContext().CONNECTIVITY_SERVICE);
-        if ( connec.getNetworkInfo(0).getState() == android.net.NetworkInfo.State.CONNECTED ||
-                connec.getNetworkInfo(0).getState() == android.net.NetworkInfo.State.CONNECTING ||
-                connec.getNetworkInfo(1).getState() == android.net.NetworkInfo.State.CONNECTING ||
-                connec.getNetworkInfo(1).getState() == android.net.NetworkInfo.State.CONNECTED ) {
-            setResponse(rView, "Terkoneksi ke Internet :)");
+
+        ConnectivityManager ConnectionManager=(ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo=ConnectionManager.getActiveNetworkInfo();
+        if(networkInfo != null && networkInfo.isConnected()==true ) {
             return true;
-        } else if (
-                connec.getNetworkInfo(0).getState() == android.net.NetworkInfo.State.DISCONNECTED ||
-                        connec.getNetworkInfo(1).getState() == android.net.NetworkInfo.State.DISCONNECTED  ) {
-            setResponse(rView, "Internet Tidak Terjangkau :(");
+        }
+        else {
             return false;
         }
-        return false;
     }
+
 
     private void setAppInfo() {
         //TODO : 5. Implementasikan proses setting app info, app info pada fungsi ini diambil dari shared preferences
-        //lblAppVersion dan lblAppName dimunculkan kembali dengan data dari shared preferences
-        lblAppVersion.setVisibility(View.VISIBLE);
-        lblAppName.setVisibility(View.VISIBLE);
+        SharedPreferences sh = getSharedPreferences("setting",MODE_PRIVATE);
 
-        lblAppName.setText(session.getApp());
-        lblAppVersion.setText(session.getVersion());
+        //lblAppVersion dan lblAppName dimunculkan kembali dengan data dari shared preferences
+        //lblAppVersion.setVisibility(View.INVISIBLE);
+        lblAppVersion.setText(sh.getString("version",""));
+        lblAppVersion.setVisibility(View.VISIBLE);
+
+        //lblAppName.setVisibility(View.INVISIBLE);
+        lblAppName.setText(sh.getString("app","not updated"));
+        lblAppName.setVisibility(View.VISIBLE);
+    }
+
+    public void intentMain(String app, String ver){
+        Intent intent = new Intent(this, MainActivity.class);
+
+        intent.putExtra("APP_KEY", app);
+        intent.putExtra("VER_KEY", ver);
+        startActivity(intent);
+    }
+
+    public void snackbar(View view){
+        Snackbar.make(view, "No Connection", Snackbar.LENGTH_SHORT).show();
+    }
+
+    public void saveInfo(){
+
     }
 
     private void checkAppVersion() {
@@ -88,26 +104,48 @@ public class SplashActivity extends AppCompatActivity {
         call.enqueue(new Callback<AppVersion>() {
             @Override
             public void onResponse(Call<AppVersion> call, Response<AppVersion> response) {
-//                Toast.makeText(SplashActivity.this, response.body().getApp(), Toast.LENGTH_SHORT).show();
+                Toast.makeText(SplashActivity.this, response.body().getApp(), Toast.LENGTH_SHORT).show();
                 //Todo : 2. Implementasikan Proses Simpan Data Yang didapat dari Server ke SharedPreferences
-                session.setApp(response.body().getApp());
-                session.setVersion(response.body().getVersion());
+                // Storing data into SharedPreferences
+
+                SharedPreferences sharedPreferences = getSharedPreferences("setting",MODE_PRIVATE);
+
+                // Creating an Editor object
+                // to edit(write to the file)
+                SharedPreferences.Editor myEdit = sharedPreferences.edit();
+
+                // Storing the key and its value
+                // as the data fetched from edittext
+                myEdit.putString("version",response.body().getVersion());
+                myEdit.putString("app",response.body().getApp());
+                //myEdit.putInt("age",Integer.parseInt(age.getText().toString()));
+
+                // Once the changes have been made,
+                // we need to commit to apply those changes made,
+                // otherwise, it will throw an error
+                myEdit.apply();
+
+
+
+
                 //Todo : 3. Implementasikan Proses Pindah Ke MainActivity Jika Proses getAppVersion() sukses
-                startActivity(new Intent(getApplicationContext(), MainActivity.class));
+                if(response.body().getVersion() != null){
+                    setAppInfo();
+                    intentMain(response.body().getApp(), response.body().getVersion());
+                }
+
+
+
             }
 
             @Override
             public void onFailure(Call<AppVersion> call, Throwable t) {
-
-//                Toast.makeText(SplashActivity.this, "Gagal Koneksi Ke Server", Toast.LENGTH_SHORT).show();
+                Toast.makeText(SplashActivity.this, "Gagal Koneksi Ke Server", Toast.LENGTH_SHORT).show();
                 //Todo : 4. Implementasikan Cara Notifikasi Ke user jika terjadi kegagalan koneksi ke server silahkan googling cara yang lain selain menggunakan TOAST
-                setResponse(rView, "Gagal Koneksi ke Server");
+                View parentLayout = findViewById(android.R.id.content);
+                snackbar(parentLayout);
             }
+
         });
     }
-
-    public void setResponse(View view, String message){
-        Snackbar.make(view, message, Snackbar.LENGTH_LONG).show();
-    }
-
 }

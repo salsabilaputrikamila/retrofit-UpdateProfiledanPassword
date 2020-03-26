@@ -42,5 +42,5 @@ dependencies {
     //recyclerview
     implementation 'androidx.recyclerview:recyclerview:1.1.0'
     //material design
-    implementation "com.google.android.material:material:1.2.0-alpha05"
+    implementation 'com.google.android.material:material:1.2.0-alpha05'
 }
